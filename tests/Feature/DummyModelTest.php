@@ -20,7 +20,22 @@ it('allows anyone to list dummy models', function () {
 
     $this->getJson('/api/dummy-models')
         ->assertOk()
-        ->assertJsonCount(3);
+        ->assertJsonCount(3, 'data')
+        ->assertJsonStructure([
+            'data',
+            'meta' => [
+                'current_page',
+                'from',
+                'per_page',
+                'total',
+                'to',
+                'last_page',
+                'links' => [
+                    ['url', 'label', 'page', 'active'],
+                ],
+                'path',
+            ],
+        ]);
 });
 
 it('allows anyone to view a dummy model', function () {

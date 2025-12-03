@@ -17,9 +17,27 @@ class DummyModelController extends Controller
         $this->middleware('permission:dummy-model.delete')->only('destroy');
     }
 
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        return response()->json(DummyModel::all());
+        $perPage = $request->integer('per_page', 15);
+
+        $paginator = DummyModel::query()
+            ->paginate($perPage)
+            ->withQueryString();
+
+        return response()->json([
+            'data' => $paginator->items(),
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'from' => $paginator->firstItem(),
+                'last_page' => $paginator->lastPage(),
+                'links' => $paginator->toArray()['links'] ?? [],
+                'path' => $paginator->path(),
+                'per_page' => $paginator->perPage(),
+                'to' => $paginator->lastItem(),
+                'total' => $paginator->total(),
+            ],
+        ]);
     }
 
     public function store(Request $request): JsonResponse

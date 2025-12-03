@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Database\Seeders\PermissionsSeeder;
+use Database\Seeders\DummySeeder;
 
 class DatabaseSeeder extends Seeder
 {
@@ -19,10 +20,10 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             PermissionsSeeder::class,
+            DummySeeder::class,
         ]);
 
         User::factory(10)->create();
-        DummyModel::factory(5)->create();
 
         User::factory()->create([
             'name' => 'Creator User',
