@@ -9,6 +9,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Config;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Illuminate\Validation\ValidationException;
+use Tests\TestCase;
+
+uses(TestCase::class);
 
 function jsonRequest(): Request
 {
@@ -19,8 +22,6 @@ function jsonRequest(): Request
 }
 
 it('renders authentication exceptions', function () {
-    $this->withoutExceptionHandling();
-
     $response = ApiException::render(jsonRequest(), new AuthenticationException());
 
     expect($response->getStatusCode())->toBe(401);
@@ -28,8 +29,6 @@ it('renders authentication exceptions', function () {
 });
 
 it('renders validation exceptions', function () {
-    $this->withoutExceptionHandling();
-
     $validation = ValidationException::withMessages(['name' => ['Required']]);
 
     $response = ApiException::render(jsonRequest(), $validation);
@@ -41,8 +40,6 @@ it('renders validation exceptions', function () {
 });
 
 it('renders not found exceptions', function () {
-    $this->withoutExceptionHandling();
-
     $exception = (new ModelNotFoundException())->setModel(\App\Models\User::class);
 
     $response = ApiException::render(jsonRequest(), $exception);
@@ -52,8 +49,6 @@ it('renders not found exceptions', function () {
 });
 
 it('renders authorization exceptions', function () {
-    $this->withoutExceptionHandling();
-
     $response = ApiException::render(jsonRequest(), new AuthorizationException('Denied'));
 
     expect($response->getStatusCode())->toBe(403);
@@ -62,7 +57,6 @@ it('renders authorization exceptions', function () {
 });
 
 it('renders http exceptions', function () {
-    $this->withoutExceptionHandling();
     Config::set('app.debug', true);
 
     $response = ApiException::render(jsonRequest(), new HttpException(418, 'Nope'));
@@ -72,10 +66,9 @@ it('renders http exceptions', function () {
 });
 
 it('renders query exceptions', function () {
-    $this->withoutExceptionHandling();
     Config::set('app.debug', true);
 
-    $queryException = new QueryException('select 1', [], new Exception('db fail'));
+    $queryException = new QueryException(connectionName: 'testing', sql: 'select 1', bindings: [], previous: new Exception('db fail'));
 
     $response = ApiException::render(jsonRequest(), $queryException);
 
