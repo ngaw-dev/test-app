@@ -21,6 +21,7 @@ it('allows anyone to list dummy models', function () {
     $this->getJson('/api/dummy-models')
         ->assertOk()
         ->assertJsonCount(3, 'data')
+        ->assertJsonCount(3, 'meta.links')
         ->assertJsonStructure([
             'data',
             'meta' => [
@@ -31,7 +32,7 @@ it('allows anyone to list dummy models', function () {
                 'to',
                 'last_page',
                 'links' => [
-                    ['url', 'label', 'page', 'active'],
+                    ['url', 'label', 'active'],
                 ],
                 'path',
             ],

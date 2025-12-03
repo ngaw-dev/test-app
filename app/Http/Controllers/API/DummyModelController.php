@@ -31,7 +31,20 @@ class DummyModelController extends Controller
                 'current_page' => $paginator->currentPage(),
                 'from' => $paginator->firstItem(),
                 'last_page' => $paginator->lastPage(),
-                'links' => $paginator->toArray()['links'] ?? [],
+                'links' => collect($paginator->toArray()['links'] ?? [])
+                    ->pipe(function ($links) {
+                        return collect([
+                            $links->firstWhere('label', '&laquo; Previous'),
+                            $links->firstWhere('active', true),
+                            $links->firstWhere('label', 'Next &raquo;'),
+                        ])->filter();
+                    })
+                    ->map(fn ($link) => [
+                        'url' => $link['url'],
+                        'label' => $link['label'],
+                        'active' => $link['active'] ?? false,
+                    ])
+                    ->values(),
                 'path' => $paginator->path(),
                 'per_page' => $paginator->perPage(),
                 'to' => $paginator->lastItem(),
