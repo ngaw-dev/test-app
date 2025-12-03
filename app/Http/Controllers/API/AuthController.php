@@ -18,7 +18,6 @@ class AuthController extends Controller
     public function __construct(SupabaseAuthService $supabaseAuth)
     {
         $this->supabaseAuth = $supabaseAuth;
-        $this->middleware('auth:sanctum')->except(['login', 'register', 'forgotPassword']);
     }
 
     /**

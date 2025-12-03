@@ -188,6 +188,56 @@ class SupabaseAuthService
         }
     }
 
+    public function signOut(string $accessToken): array
+    {
+        try {
+            $response = $this->client->post('/auth/v1/logout', [
+                'headers' => [
+                    'Authorization' => 'Bearer ' . $accessToken,
+                ],
+            ]);
+
+            return ['success' => true];
+        } catch (\Exception $e) {
+            Log::error('Supabase signout error', [
+                'message' => $e->getMessage(),
+            ]);
+
+            return [
+                'success' => false,
+                'error' => $this->parseError($e),
+            ];
+        }
+    }
+
+    public function updateUser(string $accessToken, array $attributes): array
+    {
+        try {
+            $response = $this->client->put('/auth/v1/user', [
+                'headers' => [
+                    'Authorization' => 'Bearer ' . $accessToken,
+                ],
+                'json' => $attributes,
+            ]);
+
+            $user = json_decode($response->getBody(), true);
+
+            return [
+                'success' => true,
+                'user' => $user,
+            ];
+        } catch (\Exception $e) {
+            Log::error('Supabase update user error', [
+                'message' => $e->getMessage(),
+            ]);
+
+            return [
+                'success' => false,
+                'error' => $this->parseError($e),
+            ];
+        }
+    }
+
     protected function parseError(\Exception $e): string
     {
         if ($e instanceof \GuzzleHttp\Exception\RequestException && $e->hasResponse()) {
