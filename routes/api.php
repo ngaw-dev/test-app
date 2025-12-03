@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\API\AuthController;
+use App\Http\Controllers\API\DummyModelController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -18,3 +19,5 @@ Route::prefix('auth')->group(function () {
     Route::post('refresh', [AuthController::class, 'refresh'])->middleware('auth:sanctum');
     Route::put('profile', [AuthController::class, 'updateProfile'])->middleware('auth:sanctum');
 });
+
+Route::apiResource('dummy-models', DummyModelController::class);
