@@ -1,0 +1,379 @@
+version: '3.8'
+
+services:
+  # Supabase Database (PostgreSQL)
+  db:
+    image: supabase/postgres:15.1.0.147
+    container_name: supabase_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: your-super-secret-and-long-postgres-password
+      POSTGRES_INITDB_ARGS: --encoding=UTF-8
+    volumes:
+      - ./volumes/db:/var/lib/postgresql/data
+    ports:
+      - "64320:5432"
+    command:
+      - postgres
+      - -c
+      - config_file=/etc/postgresql/postgresql.conf
+      - -c
+      - log_min_messages=fatal
+    healthcheck:
+      test: pg_isready -U postgres -h localhost
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Supabase Authentication
+  auth:
+    image: supabase/gotrue:v2.142.0
+    container_name: supabase_auth
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: 9999
+      API_EXTERNAL_URL: http://supabase-dev.local:64322
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgresql://postgres:your-super-secret-and-long-postgres-password@db:5432/postgres
+      GOTRUE_SITE_URL: http://supabase-dev.local
+      GOTRUE_URI_ALLOW_LIST: "*"
+      GOTRUE_DISABLE_SIGNUP: false
+      GOTRUE_JWT_ADMIN_ROLES: service_role
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_JWT_EXP: 3600
+      GOTRUE_JWT_SECRET: your-super-secret-jwt-token-with-at-least-32-characters-long
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: true
+      GOTRUE_MAILER_AUTOCONFIRM: true
+      GOTRUE_SMTP_ADMIN_EMAIL: admin@example.com
+      GOTRUE_SMTP_HOST: supabase-mail
+      GOTRUE_SMTP_PORT: 2500
+      GOTRUE_SMTP_USER: fake_mail_user
+      GOTRUE_SMTP_PASS: fake_mail_password
+      GOTRUE_SMTP_SENDER_NAME: fake_sender
+      GOTRUE_RATE_LIMIT_EMAIL_SENT: 3600
+    ports:
+      - "64324:9999"
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - --no-verbose
+        - --tries=1
+        - --spider
+        - http://localhost:9999/health
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Supabase REST API
+  rest:
+    image: postgrest/postgrest:v12.2.0
+    container_name: supabase_rest
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      auth:
+        condition: service_healthy
+    environment:
+      PGRST_DB_URI: postgresql://authenticator:your-super-secret-and-long-postgres-password@db:5432/postgres
+      PGRST_DB_SCHEMAS: public,storage,graphql_public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_DB_USE_LEGACY_GUCS: "false"
+      PGRST_JWT_SECRET: your-super-secret-jwt-token-with-at-least-32-characters-long
+      PGRST_JWT_AUD: authenticated
+      PGRST_SERVER_TRACE_HEADERS: "false"
+    command:
+      - postgrest
+    ports:
+      - "64325:3000"
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - --no-verbose
+        - --tries=1
+        - --spider
+        - http://localhost:3000/ready
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Supabase Storage
+  storage:
+    image: supabase/storage-api:v0.60.0
+    container_name: supabase_storage
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      rest:
+        condition: service_healthy
+    environment:
+      ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyAgCiAgICAicm9sZSI6ICJhbm9uIiwKICAgICJpc3MiOiAic3VwYWJhc2UtZGVtbyIsCiAgICAiaWF0IjogMTY0MTc2OTIwMCwKICAgICJleHAiOiAxNzk5NTM1NjAwCn0.dc_X5iR_VP_qT0zsiyj_I_OZ2T9FtRU2BBNWN8Bu4GE
+      SERVICE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyAgCiAgICAicm9sZSI6ICJzZXJ2aWNlX3JvbGUiLAogICAgImlzcyI6ICJzdXBhYmFzZS1kZW1vIiwKICAgICJpYXQiOiAxNjQxNzY5MjAwLAogICAgImV4cCI6IDE3OTk1MzU2MDAKfQ.DaYlNEoUrrEn2Ig7tqibS-PHK5vgusbcbo7X36XVt4Q
+      POSTGREST_URL: http://rest:3000
+      PGRST_JWT_SECRET: your-super-secret-jwt-token-with-at-least-32-characters-long
+      DATABASE_URL: postgresql://supabase_storage_admin:your-super-secret-and-long-postgres-password@db:5432/postgres
+      FILE_SIZE_LIMIT: 52428800
+      STORAGE_BACKEND: file
+      FILE_STORAGE_BACKEND_PATH: /var/lib/storage
+      TENANT_ID: your-tenant-id
+      REGION: local
+      GLOBAL_S3_BUCKET: ""
+      ENABLE_IMAGE_TRANSFORMATION: "true"
+      IMGPROXY_URL: http://imgproxy:5001
+    volumes:
+      - ./volumes/storage:/var/lib/storage
+    ports:
+      - "64326:5000"
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - --no-verbose
+        - --tries=1
+        - --spider
+        - http://localhost:5000/status
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Supabase Functions
+  functions:
+    image: supabase/edge-runtime:v1.54.3
+    container_name: supabase_functions
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      JWT_SECRET: your-super-secret-jwt-token-with-at-least-32-characters-long
+      SUPABASE_URL: http://kong:8000
+      SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyAgCiAgICAicm9sZSI6ICJhbm9uIiwKICAgICJpc3MiOiAic3VwYWJhc2UtZGVtbyIsCiAgICAiaWF0IjogMTY0MTc2OTIwMCwKICAgICJleHAiOiAxNzk5NTM1NjAwCn0.dc_X5iR_VP_qT0zsiyj_I_OZ2T9FtRU2BBNWN8Bu4GE
+      SUPABASE_SERVICE_ROLE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyAgCiAgICAicm9sZSI6ICJzZXJ2aWNlX3JvbGUiLAogICAgImlzcyI6ICJzdXBhYmFzZS1kZW1vIiwKICAgICJpYXQiOiAxNjQxNzY5MjAwLAogICAgImV4cCI6IDE3OTk1MzU2MDAKfQ.DaYlNEoUrrEn2Ig7tqibS-PHK5vgusbcbo7X36XVt4Q
+      VERIFY_JWT: "false"
+    ports:
+      - "64327:9000"
+    volumes:
+      - ./volumes/functions:/home/deno/functions
+    command:
+      - start
+      - --main-service
+      - /home/deno/functions/main
+
+  # Supabase Kong Gateway
+  kong:
+    image: kong:3.4.3
+    container_name: supabase_kong
+    restart: unless-stopped
+    depends_on:
+      auth:
+        condition: service_healthy
+      rest:
+        condition: service_healthy
+      storage:
+        condition: service_healthy
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /var/lib/kong/kong.yml
+      KONG_DNS_ORDER: LAST,A,CNAME
+      KONG_PLUGINS: request-transformer,cors,key-auth,acl,basic-auth
+      KONG_NGINX_DAEMON: "on"
+      KONG_NGINX_WORKER_PROCESSES: "2"
+    volumes:
+      - ./volumes/kong/kong.yml:/var/lib/kong/kong.yml
+      - ./volumes/kong/ssl:/etc/kong/ssl
+    ports:
+      - "64322:8000/tcp"
+      - "64323:8443/tcp"
+    healthcheck:
+      test:
+        - CMD
+        - kong
+        - health
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Supabase Studio
+  studio:
+    image: supabase/studio:v20240417-ac424540
+    container_name: supabase_studio
+    restart: unless-stopped
+    depends_on:
+      kong:
+        condition: service_healthy
+    environment:
+      STUDIO_PG_META_URL: http://meta:8080
+      POSTGRESQL_EXTERNAL_URL: postgresql://postgres:your-super-secret-and-long-postgres-password@db:5432/postgres
+      DEFAULT_ORGANIZATION_NAME: Default Organization
+      DEFAULT_PROJECT_NAME: Default Project
+      SUPABASE_URL: http://kong:8000
+      SUPABASE_PUBLIC_URL: http://supabase-dev.local:64322
+      SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyAgCiAgICAicm9sZSI6ICJhbm9uIiwKICAgICJpc3MiOiAic3VwYWJhc2UtZGVtbyIsCiAgICAiaWF0IjogMTY0MTc2OTIwMCwKICAgICJleHAiOiAxNzk5NTM1NjAwCn0.dc_X5iR_VP_qT0zsiyj_I_OZ2T9FtRU2BBNWN8Bu4GE
+      SUPABASE_SERVICE_ROLE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyAgCiAgICAicm9sZSI6ICJzZXJ2aWNlX3JvbGUiLAogICAgImlzcyI6ICJzdXBhYmFzZS1kZW1vIiwKICAgICJpYXQiOiAxNjQxNzY5MjAwLAogICAgImV4cCI6IDE3OTk1MzU2MDAKfQ.DaYlNEoUrrEn2Ig7tqibS-PHK5vgusbcbo7X36XVt4Q
+      LOGFLARE_API_KEY: your-super-secret-and-long-logflare-key-private
+      LOGFLARE_URL: http://analytics:4000
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    ports:
+      - "64328:3000/tcp"
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - --no-verbose
+        - --tries=1
+        - --spider
+        - http://localhost:3000/api/profile
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Supabase Meta
+  meta:
+    image: supabase/postgres-meta:v0.80.0
+    container_name: supabase_meta
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PG_META_PORT: 8080
+      PG_META_DB_HOST: db
+      PG_META_DB_PORT: 5432
+      PG_META_DB_NAME: postgres
+      PG_META_DB_USER: postgres
+      PG_META_DB_PASSWORD: your-super-secret-and-long-postgres-password
+    ports:
+      - "64329:8080"
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - --no-verbose
+        - --tries=1
+        - --spider
+        - http://localhost:8080/health
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Supabase Realtime
+  realtime:
+    image: supabase/realtime:v2.30.42
+    container_name: supabase_realtime
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PORT: 4000
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: supabase_realtime_admin
+      DB_PASSWORD: your-super-secret-and-long-postgres-password
+      DB_NAME: postgres
+      DB_AFTER_CONNECT_QUERY: 'SET search_path TO _realtime'
+      API_EXTERNAL_URL: http://supabase-dev.local
+      SECRET_KEY_BASE: UpNVntn3cDxHJpq99YMc1T1AQgQpc8kfYTuRgBiYa15BLrx8etQoXz3gZv1/u2oq
+      ERL_AFLAGS: -proto_dist inet_tcp
+      ERL_EPMD_PORT: 4369
+      ERL_DISTRIBUTION: sname
+      DNS_NODES: 'realtime:64330'
+      RLIMIT: 65536
+    ports:
+      - "64330:4000/tcp"
+      - "64331:4369/tcp"
+    healthcheck:
+      test:
+        - CMD
+        - bash
+        - -c
+        - 'curl --silent --fail http://localhost:4000/health || exit 1'
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Supabase Storage Image Proxy
+  imgproxy:
+    image: darthsim/imgproxy:v3.25.0
+    container_name: supabase_imgproxy
+    restart: unless-stopped
+    environment:
+      IMGPROXY_BIND: ":5001"
+      IMGPROXY_LOCAL_FILESYSTEM_ROOT: /var/lib/storage
+      IMGPROXY_USE_WEBP_DETECTION: "true"
+      IMGPROXY_ENABLE_WEBP_DETECTION: "true"
+    volumes:
+      - ./volumes/storage:/var/lib/storage
+    ports:
+      - "64332:5001"
+    healthcheck:
+      test:
+        - CMD
+        - imgproxy
+        - health
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Supabase Mail (fake SMTP)
+  mail:
+    image: inbucket/inbucket:3.2.2
+    container_name: supabase_mail
+    restart: unless-stopped
+    ports:
+      - "64333:2500/tcp"
+      - "64334:9000/tcp"
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - --no-verbose
+        - --tries=1
+        - --spider
+        - http://localhost:9000/health
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Supabase Analytics (Logflare)
+  analytics:
+    image: supabase/logflare:v1.0.2
+    container_name: supabase_analytics
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      LOGFLARE_NODE_HOST: 127.0.0.1
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: postgres
+      DB_USER: supabase_admin
+      DB_PASSWORD: your-super-secret-and-long-postgres-password
+      DB_SCHEMA: _analytics
+      LOGFLARE_API_KEY: your-super-secret-and-long-logflare-key-private
+      LOGFLARE_PUBLIC_API_KEY: your-super-secret-and-long-logflare-key-public
+      LOGFLARE_SINGLE_TENANT: "true"
+      LOGFLARE_SUPABASE_MODE: "true"
+      LOGFLARE_FEATURE_FLAG: "multibackend"
+      GOOGLE_PROJECT_ID: "your-google-project-id"
+      GOOGLE_PROJECT_NUMBER: "your-google-project-number"
+    volumes:
+      - ./volumes/analytics:/var/lib/postgresql
+    ports:
+      - "64335:4000/tcp"
+
+volumes:
+  db:
+  storage:
+  analytics:

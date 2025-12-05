@@ -197,7 +197,15 @@ class ApiException extends Exception
     /**
      * Render the exception as an HTTP response.
      */
-    public static function render(Request $request, Throwable $e): JsonResponse
+    public function render(Request $request): JsonResponse
+    {
+        return self::renderException($request, $this);
+    }
+
+    /**
+     * Render the given exception as an HTTP response.
+     */
+    public static function renderException(Request $request, Throwable $e): JsonResponse
     {
         $exceptionClass = get_class($e);
 

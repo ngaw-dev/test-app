@@ -22,7 +22,7 @@ function jsonRequest(): Request
 }
 
 it('renders authentication exceptions', function () {
-    $response = ApiException::render(jsonRequest(), new AuthenticationException());
+    $response = ApiException::renderException(jsonRequest(), new AuthenticationException());
 
     expect($response->getStatusCode())->toBe(401);
     expect($response->getData(true)['error']['code'])->toBe('unauthenticated');
@@ -31,7 +31,7 @@ it('renders authentication exceptions', function () {
 it('renders validation exceptions', function () {
     $validation = ValidationException::withMessages(['name' => ['Required']]);
 
-    $response = ApiException::render(jsonRequest(), $validation);
+    $response = ApiException::renderException(jsonRequest(), $validation);
     $data = $response->getData(true);
 
     expect($response->getStatusCode())->toBe(422);
@@ -42,14 +42,14 @@ it('renders validation exceptions', function () {
 it('renders not found exceptions', function () {
     $exception = (new ModelNotFoundException())->setModel(\App\Models\User::class);
 
-    $response = ApiException::render(jsonRequest(), $exception);
+    $response = ApiException::renderException(jsonRequest(), $exception);
 
     expect($response->getStatusCode())->toBe(404);
     expect($response->getData(true)['error']['code'])->toBe('resource_not_found');
 });
 
 it('renders authorization exceptions', function () {
-    $response = ApiException::render(jsonRequest(), new AuthorizationException('Denied'));
+    $response = ApiException::renderException(jsonRequest(), new AuthorizationException('Denied'));
 
     expect($response->getStatusCode())->toBe(403);
     expect($response->getData(true)['error']['code'])->toBe('forbidden');
@@ -59,7 +59,7 @@ it('renders authorization exceptions', function () {
 it('renders http exceptions', function () {
     Config::set('app.debug', true);
 
-    $response = ApiException::render(jsonRequest(), new HttpException(418, 'Nope'));
+    $response = ApiException::renderException(jsonRequest(), new HttpException(418, 'Nope'));
 
     expect($response->getStatusCode())->toBe(418);
     expect($response->getData(true)['error']['code'])->toBe('http_exception');
@@ -70,7 +70,7 @@ it('renders query exceptions', function () {
 
     $queryException = new QueryException(connectionName: 'testing', sql: 'select 1', bindings: [], previous: new Exception('db fail'));
 
-    $response = ApiException::render(jsonRequest(), $queryException);
+    $response = ApiException::renderException(jsonRequest(), $queryException);
 
     expect($response->getStatusCode())->toBe(500);
     expect($response->getData(true)['error']['code'])->toBe('database_error');

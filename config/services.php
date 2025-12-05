@@ -35,4 +35,22 @@ return [
         ],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Supabase Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Here you may configure your Supabase settings. These settings will be
+    | used by the SupabaseService to interact with your Supabase instance.
+    |
+    */
+
+    'supabase' => [
+        'url' => env('SUPABASE_URL'),
+        'key' => env('SUPABASE_SECRET_KEY'),
+        'jwt_secret' => env('SUPABASE_JWT_SECRET', env('JWT_SECRET')),
+        'storage_url' => env('SUPABASE_STORAGE_URL'),
+        'studio_url' => env('SUPABASE_STUDIO_URL'),
+    ],
+
 ];
