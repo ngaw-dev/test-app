@@ -1,0 +1,77 @@
+#!/bin/bash
+
+# Supabase Studio launcher for DDEV
+# Usage: ddev supabase-studio
+
+set -euo pipefail
+
+echo "🚀 Starting Supabase Studio..."
+
+# Check if Studio is already running
+if docker ps --format '{{.Names}}' | grep -q "ddev-${DDEV_SITENAME}-supabase-studio"; then
+    echo "✅ Supabase Studio is already running"
+    echo "🌐 Access it at: http://localhost:9990"
+    echo ""
+    echo "If it's not accessible, try one of these alternatives:"
+    echo "1. Direct container access: docker exec -it ddev-${DDEV_SITENAME}-supabase-studio sh"
+    echo "2. Port forward method below"
+else
+    echo "🔄 Starting Supabase Studio container..."
+
+    # Start Studio with direct database access (simplified)
+    docker run -d \
+        --name ddev-${DDEV_SITENAME}-supabase-studio \
+        --network ddev-${DDEV_SITENAME}_default \
+        -p 9990:3000 \
+        -e POSTGRES_PASSWORD="${DDEV_PRIMARY_DB_PASSWORD:-postgres}" \
+        -e SUPABASE_DB_URL="postgresql://postgres:${DDEV_PRIMARY_DB_PASSWORD:-postgres}@supabase-db:5432/postgres" \
+        -e SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0" \
+        -e SUPABASE_SERVICE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU" \
+        -e JWT_SECRET="your-super-secret-jwt-token-with-at-least-32-characters-long" \
+        -e NEXT_PUBLIC_SUPABASE_URL="http://localhost:9995" \
+        -e NEXT_PUBLIC_SITE_URL="http://localhost:9990" \
+        -e DEFAULT_ORGANIZATION_NAME="${DDEV_SITENAME}" \
+        -e DEFAULT_PROJECT_NAME="${DDEV_SITENAME}" \
+        --restart unless-stopped \
+        supabase/studio:latest
+
+    echo "⏳ Waiting for Studio to start..."
+    sleep 10
+fi
+
+echo ""
+echo "🎯 Supabase Studio Access Options:"
+echo "================================="
+echo "1. **Primary URL**: http://localhost:9990"
+echo "2. **Alternative**: http://127.0.0.1:9990"
+echo ""
+echo "📊 What you can do in Studio:"
+echo "   • Browse and edit database tables"
+echo "   • Run SQL queries"
+echo "   • Manage users and authentication"
+echo "   • Set up Row Level Security"
+echo "   • View API documentation"
+echo ""
+echo "🔧 Database Connection Info:"
+echo "   • Host: supabase-db (from DDEV container)"
+echo "   • External Host: localhost:54322"
+echo "   • Database: postgres"
+echo "   • Username: postgres"
+echo "   • Password: postgres"
+echo ""
+echo "📧 Email Testing (Mailpit): http://localhost:9988"
+echo ""
+echo "🐳 If Studio isn't accessible:"
+echo "   docker exec -it ddev-${DDEV_SITENAME}-supabase-studio sh"
+echo "   # Then check: curl http://localhost:3000"
+
+# Try to open in browser
+if command -v open >/dev/null 2>&1; then
+    echo "🌐 Opening Studio in browser..."
+    open http://localhost:9990 2>/dev/null || echo "Please manually open http://localhost:9990"
+elif command -v xdg-open >/dev/null 2>&1; then
+    echo "🌐 Opening Studio in browser..."
+    xdg-open http://localhost:9990 2>/dev/null || echo "Please manually open http://localhost:9990"
+else
+    echo "Please open http://localhost:9990 in your browser"
+fi

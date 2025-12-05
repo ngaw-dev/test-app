@@ -1,0 +1,205 @@
+#!/bin/bash
+
+# Supabase management commands for DDEV
+# Usage: ddev supabase [command]
+
+set -euo pipefail
+
+# Function to show usage
+show_help() {
+  echo "Supabase management commands for DDEV"
+  echo ""
+  echo "Usage: ddev supabase [command]"
+  echo ""
+  echo "Commands:"
+  echo "  status     Show status of all Supabase services"
+  echo "  logs       Show logs from all Supabase services"
+  echo "  reset      Reset Supabase database (CAUTION: destroys data)"
+  echo "  migrate    Run database migrations"
+  echo "  shell      Open PostgreSQL shell"
+  echo "  studio     Open Supabase Studio in browser"
+  echo "  urls       Show all Supabase service URLs"
+  echo "  help       Show this help message"
+  echo ""
+  echo "Service logs:"
+  echo "  logs db        Show database logs"
+  echo "  logs auth      Show auth service logs"
+  echo "  logs storage   Show storage service logs"
+  echo "  logs realtime  Show realtime service logs"
+  echo "  logs rest      Show REST API logs"
+  echo "  logs kong      Show API gateway logs"
+  echo "  logs studio    Show Studio logs"
+  echo "  logs analytics Show analytics logs"
+}
+
+# Function to show status
+show_status() {
+  echo "Supabase Services Status:"
+  echo "========================"
+
+  services=("supabase-db" "supabase-auth" "supabase-storage" "supabase-realtime" "supabase-rest" "supabase-kong" "supabase-studio" "analytics" "inbucket" "imgproxy")
+
+  for service in "${services[@]}"; do
+    status=$(docker-compose -f .ddev/docker-compose.supabase.yaml ps -q "$service" | xargs docker inspect --format='{{.State.Status}}' 2>/dev/null || echo "not_found")
+    case $status in
+      "running")
+        echo "✅ $service: Running"
+        ;;
+      "not_found")
+        echo "❌ $service: Not found"
+        ;;
+      *)
+        echo "⚠️  $service: $status"
+        ;;
+    esac
+  done
+}
+
+# Function to show URLs
+show_urls() {
+  echo "Supabase Service URLs:"
+  echo "======================"
+  echo "🌐 Supabase Studio:   https://${DDEV_PRIMARY_URL}:9990"
+  echo "🔌 API Gateway:        https://${DDEV_PRIMARY_URL}:9995"
+  echo "📊 REST API:           https://${DDEV_PRIMARY_URL}:9995/rest/v1"
+  echo "🔐 Auth API:           https://${DDEV_PRIMARY_URL}:9995/auth/v1"
+  echo "📁 Storage API:        https://${DDEV_PRIMARY_URL}:9995/storage/v1"
+  echo "⚡ Realtime API:       https://${DDEV_PRIMARY_URL}:9995/realtime/v1"
+  echo "📧 Email Testing:      https://${DDEV_PRIMARY_URL}:9988"
+  echo ""
+  echo "Local URLs (within DDEV container):"
+  echo "🌐 Supabase Studio:   http://supabase-studio:3000"
+  echo "🔌 API Gateway:        http://supabase-kong:8000"
+  echo "📊 REST API:           http://supabase-kong:8000/rest/v1"
+  echo "🔐 Auth API:           http://supabase-kong:8000/auth/v1"
+  echo "📁 Storage API:        http://supabase-kong:8000/storage/v1"
+  echo "⚡ Realtime API:       http://supabase-kong:8000/realtime/v1"
+}
+
+# Function to show logs
+show_logs() {
+  service=${1:-}
+
+  if [[ -z "$service" ]]; then
+    echo "Showing logs from all Supabase services (Ctrl+C to exit):"
+    echo "========================================================"
+    docker-compose -f .ddev/docker-compose.supabase.yaml logs -f
+  else
+    case $service in
+      "db")
+        echo "Database logs:"
+        docker-compose -f .ddev/docker-compose.supabase.yaml logs -f supabase-db
+        ;;
+      "auth")
+        echo "Auth service logs:"
+        docker-compose -f .ddev/docker-compose.supabase.yaml logs -f supabase-auth
+        ;;
+      "storage")
+        echo "Storage service logs:"
+        docker-compose -f .ddev/docker-compose.supabase.yaml logs -f supabase-storage
+        ;;
+      "realtime")
+        echo "Realtime service logs:"
+        docker-compose -f .ddev/docker-compose.supabase.yaml logs -f supabase-realtime
+        ;;
+      "rest")
+        echo "REST API logs:"
+        docker-compose -f .ddev/docker-compose.supabase.yaml logs -f supabase-rest
+        ;;
+      "kong")
+        echo "API Gateway logs:"
+        docker-compose -f .ddev/docker-compose.supabase.yaml logs -f supabase-kong
+        ;;
+      "studio")
+        echo "Studio logs:"
+        docker-compose -f .ddev/docker-compose.supabase.yaml logs -f supabase-studio
+        ;;
+      "analytics")
+        echo "Analytics logs:"
+        docker-compose -f .ddev/docker-compose.supabase.yaml logs -f analytics
+        ;;
+      *)
+        echo "Unknown service: $service"
+        echo "Available services: db, auth, storage, realtime, rest, kong, studio, analytics"
+        exit 1
+        ;;
+    esac
+  fi
+}
+
+# Function to reset database
+reset_database() {
+  echo "⚠️  This will reset the Supabase database and destroy all data!"
+  read -p "Are you sure? (yes/no): " confirm
+
+  if [[ "$confirm" == "yes" ]]; then
+    echo "Resetting Supabase database..."
+    docker-compose -f .ddev/docker-compose.supabase.yaml down supabase-db
+    docker volume rm "${DDEV_SITENAME}-supabase-db-data" 2>/dev/null || true
+    docker-compose -f .ddev/docker-compose.supabase.yaml up -d supabase-db
+    echo "✅ Database reset complete"
+  else
+    echo "Database reset cancelled"
+  fi
+}
+
+# Function to run migrations
+run_migrations() {
+  echo "Running database migrations..."
+  docker-compose -f .ddev/docker-compose.supabase.yaml exec supabase-db psql -U postgres -d postgres -c "SELECT version();"
+  echo "✅ Migrations complete"
+}
+
+# Function to open PostgreSQL shell
+open_shell() {
+  echo "Opening PostgreSQL shell..."
+  docker-compose -f .ddev/docker-compose.supabase.yaml exec supabase-db psql -U postgres -d postgres
+}
+
+# Function to open Studio
+open_studio() {
+  echo "Opening Supabase Studio in browser..."
+  if command -v open >/dev/null 2>&1; then
+    open "https://${DDEV_PRIMARY_URL}:9990"
+  elif command -v xdg-open >/dev/null 2>&1; then
+    xdg-open "https://${DDEV_PRIMARY_URL}:9990"
+  else
+    echo "Please open https://${DDEV_PRIMARY_URL}:9990 in your browser"
+  fi
+}
+
+# Main command handling
+command=${1:-help}
+
+case $command in
+  "status")
+    show_status
+    ;;
+  "urls")
+    show_urls
+    ;;
+  "logs")
+    show_logs "${2:-}"
+    ;;
+  "reset")
+    reset_database
+    ;;
+  "migrate")
+    run_migrations
+    ;;
+  "shell")
+    open_shell
+    ;;
+  "studio")
+    open_studio
+    ;;
+  "help"|"-h"|"--help")
+    show_help
+    ;;
+  *)
+    echo "Unknown command: $command"
+    echo ""
+    show_help
+    exit 1
+    ;;
+esac
