@@ -60,7 +60,7 @@ services:
       GOTRUE_RATE_LIMIT_SMS_SENT: 3600
       GOTRUE_SECURITY_UPDATE_PASSWORD_REQUIRE_REAUTHENTICATION: "true"
       GOTRUE_SECURITY_REFRESH_TOKEN_ROTATION_ENABLED: "true"
-      GOTRUE_SESSIONS_TIMEBOX: 2419200
+      GOTRUE_SESSIONS_TIMEBOX: 2419200h
       GOTRUE_SESSIONS_SINGLE_PER_USER: "true"
     depends_on:
       - supabase-db
@@ -152,15 +152,20 @@ services:
       JWT_SECRET: ${SUPABASE_JWT_SECRET:-your-super-secret-jwt-token-with-at-least-32-characters-long}
       DATABASE_URL: postgresql://postgres:${DDEV_PRIMARY_DB_PASSWORD:-postgres}@supabase-db:5432/postgres
       # Studio specific settings
-      STUDIO_PG_META_URL: http://supabase-db:5432
+      STUDIO_PG_META_URL: http://supabase-rest:3000
       STUDIO_DEFAULT_ORGANIZATION: ${DDEV_SITENAME}
       STUDIO_DEFAULT_PROJECT: ${DDEV_SITENAME}
-      # Fix for Studio binding
-      NEXT_PUBLIC_SUPABASE_URL: http://localhost:9995
+      # Fix for Studio binding - bypass Kong and connect directly
+      NEXT_PUBLIC_SUPABASE_URL: http://localhost:9996
       NEXT_PUBLIC_SITE_URL: http://localhost:9990
+      SUPABASE_PUBLIC_URL: http://localhost:9996
+      # Direct database connection
+      POSTGRES_PASSWORD: ${DDEV_PRIMARY_DB_PASSWORD:-postgres}
+      POSTGRES_DB_URL: postgresql://postgres:${DDEV_PRIMARY_DB_PASSWORD:-postgres}@supabase-db:5432/postgres
     depends_on:
       - supabase-db
-      - supabase-kong
+      - supabase-rest
+      - supabase-auth
     networks:
       - default
     ports:

@@ -1,0 +1,112 @@
+#!/bin/bash
+
+# Supabase Launcher for DDEV
+# Usage: ddev supabase-studio
+
+set -euo pipefail
+
+echo "🚀 Supabase Studio Status for ${DDEV_SITENAME}"
+echo "=============================================="
+
+# Check if Studio is running
+if docker ps --format '{{.Names}}' | grep -q "ddev-${DDEV_SITENAME}-supabase-studio"; then
+    echo "✅ Supabase Studio: RUNNING"
+    echo "🌐 Access URL: http://localhost:9990"
+    echo ""
+
+    # Check database status
+    if docker ps --format '{{.Names}}' | grep -q "ddev-${DDEV_SITENAME}-supabase-db"; then
+        echo "✅ PostgreSQL Database: RUNNING"
+        echo "🔗 External Access: localhost:54322"
+        echo "👤 User: postgres"
+        echo "🔐 Password: postgres"
+        echo "📊 Database: postgres"
+        echo ""
+    else
+        echo "❌ PostgreSQL Database: NOT RUNNING"
+    fi
+
+    # Check Auth service
+    if docker ps --format '{{.Names}}' | grep -q "ddev-${DDEV_SITENAME}-supabase-auth"; then
+        echo "✅ Auth Service: RUNNING"
+        echo "🔗 Auth URL: http://localhost:9998"
+    else
+        echo "❌ Auth Service: NOT RUNNING"
+    fi
+
+    # Check PostgREST
+    if docker ps --format '{{.Names}}' | grep -q "ddev-${DDEV_SITENAME}-supabase-rest"; then
+        echo "✅ PostgREST API: RUNNING"
+        echo "🔗 API URL: http://localhost:9996"
+    else
+        echo "❌ PostgREST API: NOT RUNNING"
+    fi
+
+    # Check Kong (may be failing)
+    if docker ps --format '{{.Names}}' | grep -q "ddev-${DDEV_SITENAME}-supabase-kong"; then
+        KONG_STATUS=$(docker ps --format "{{.Names}}\t{{.Status}}" | grep "supabase-kong" | cut -f2)
+        if echo "$KONG_STATUS" | grep -q "Restarting"; then
+            echo "⚠️  Kong Gateway: RESTARTING (API Gateway issues)"
+        else
+            echo "✅ Kong Gateway: RUNNING"
+        fi
+        echo "🔗 Kong URL: http://localhost:9997"
+    else
+        echo "❌ Kong Gateway: NOT RUNNING"
+    fi
+
+    # Check Mailpit
+    if docker ps --format '{{.Names}}' | grep -q "ddev-${DDEV_SITENAME}-mailpit"; then
+        echo "✅ Mailpit Email Test: RUNNING"
+        echo "🔧 Email Testing: http://localhost:9988"
+    else
+        echo "❌ Mailpit Email Test: NOT RUNNING"
+    fi
+
+    echo ""
+    echo "📋 Database Management Commands:"
+    echo "  ddev db-admin shell      - Open PostgreSQL shell"
+    echo "  ddev db-admin status     - Show database status and tables"
+    echo "  ddev db-admin list-tables - List all tables"
+    echo "  ddev db-admin backup     - Create database backup"
+    echo "  ddev db-admin query      - Run SQL queries"
+    echo ""
+    echo "🔧 Environment Configuration:"
+    echo "  Database URL: postgresql://postgres:postgres@supabase-db:5432/postgres"
+    echo "  Auth Service: http://localhost:9998"
+    echo "  REST API: http://localhost:9996"
+    echo ""
+    echo "📝 Current Working Tables:"
+
+    # Show current tables
+    docker exec "ddev-${DDEV_SITENAME}-supabase-db" psql -U postgres -d postgres -c "\dt" 2>/dev/null | grep -E "(storage|auth|public)" | head -5 || echo "  No custom tables found"
+
+    echo ""
+    echo "🎯 Quick Access Links:"
+    echo "  Supabase Studio: http://localhost:9990"
+    echo "  DDEV Application: https://${DDEV_SITENAME}.ddev.site"
+    echo "  Mailpit (Email Testing): http://localhost:9988"
+
+    # Try to open Studio in browser
+    echo ""
+    if command -v open >/dev/null 2>&1; then
+        echo "🌐 Opening Supabase Studio in your browser..."
+        open http://localhost:9990 2>/dev/null || echo "   Please manually open: http://localhost:9990"
+    elif command -v xdg-open >/dev/null 2>&1; then
+        echo "🌐 Opening Supabase Studio in your browser..."
+        xdg-open http://localhost:9990 2>/dev/null || echo "   Please manually open: http://localhost:9990"
+    else
+        echo "Please open http://localhost:9990 in your browser"
+    fi
+
+else
+    echo "❌ Supabase Studio is NOT running"
+    echo ""
+    echo "🔧 To start Supabase services:"
+    echo "  ddev restart"
+    echo ""
+    echo "💡 If services fail to start, check:"
+    echo "  - Docker Desktop is running"
+    echo "  - No port conflicts (9990, 54322, 9988)"
+    echo "  - DDEV is properly configured"
+fi
